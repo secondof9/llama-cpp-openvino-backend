@@ -41,32 +41,6 @@ The YAML file (`backends/llama-cpp-openvino.yaml`) defines:
     - "intel"
 ```
 
-### 2. Access the image
-
-The image is now **public** — no authentication required. Anyone can pull it directly:
-
-```bash
-docker pull ghcr.io/secondof9/llama-cpp-openvino-backend:main
-```
-
-Gallery files never contain secrets. If you ever prefer to keep the image private instead, you can revert it (note: GitHub does not allow reverting a public package back to private) and supply credentials instead — see below.
-
-### 3. Keep it private — add credentials (optional)
-
-If you keep the image private, create a `credentials.yaml`:
-
-```yaml
-- match: ghcr.io/secondof9
-  username: secondof9
-  password: <your GitHub PAT or GHCR token>
-```
-
-Then run LocalAI with:
-
-```bash
-local-ai run --credentials-file credentials.yaml
-```
-
 ---
 
 ## Option 2: Run the image directly
