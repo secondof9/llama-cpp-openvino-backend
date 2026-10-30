@@ -24,7 +24,7 @@ LocalAI can pull custom backends from a **backend gallery** — a simple YAML fi
 ### 1. Point LocalAI at this repo's gallery YAML
 
 ```bash
-export LOCALAI_BACKEND_GALLERIES='[{"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}']'
+export LOCALAI_BACKEND_GALLERIES='[{"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}]'
 ```
 
 The YAML file (`backends/llama-cpp-openvino.yaml`) defines:
@@ -41,14 +41,17 @@ The YAML file (`backends/llama-cpp-openvino.yaml`) defines:
     - "intel"
 ```
 
-### 2. Make the image accessible
+### 2. Access the image
 
-The image is currently **private** (requires authentication). Either:
+The image is now **public** — no authentication required. Anyone can pull it directly:
 
-- **Make it public:** Go to the package page → **Settings** → **Change package visibility** → **Public**, **or**
-- **Keep it private:** provide credentials (see below).
+```bash
+docker pull ghcr.io/secondof9/llama-cpp-openvino-backend:main
+```
 
-### 3. Keep it private — add credentials
+Gallery files never contain secrets. If you ever prefer to keep the image private instead, you can revert it (note: GitHub does not allow reverting a public package back to private) and supply credentials instead — see below.
+
+### 3. Keep it private — add credentials (optional)
 
 If you keep the image private, create a `credentials.yaml`:
 
@@ -63,8 +66,6 @@ Then run LocalAI with:
 ```bash
 local-ai run --credentials-file credentials.yaml
 ```
-
-Gallery files never contain secrets — credentials are kept separate.
 
 ---
 
@@ -85,4 +86,4 @@ docker run -d \
   -p 8080:8080 \
   ghcr.io/secondof9/llama-cpp-openvino-backend:main \
   --model /path/to/your/model.gguf
-```n
+```
