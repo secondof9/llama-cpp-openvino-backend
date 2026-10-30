@@ -1,29 +1,88 @@
 # LocalAI OpenVINO Llama.cpp Backend
 
-This repository provides a CI/CD pipeline to build a custom Docker image of `llama.cpp` compiled with **Intel OpenVINO** support. The resulting image is automatically pushed to GitHub Container Registry (GHCR).
+This repository builds a custom Docker image of `llama.cpp` compiled with **Intel OpenVINO** support and pushes it to GitHub Container Registry (GHCR). It is designed to be used as a custom backend for [LocalAI](https://localai.io/).
 
 ## Features
-- **OpenVINO Acceleration:** Optimized for Intel CPUs, iGPUs, and NPUs.
-- **Automated CI/CD:** Automatically builds and pushes to GHCR on every push to `main`.
-- **API Ready:** Uses `llama-server` as the entrypoint, making it compatible with LocalAI.
+- **OpenVINO Acceleration:** Optimized for Intel CPUs, iGPUs, dGPUs, and NPUs.
+- **Automated CI/CD:** Builds and pushes to GHCR on every push to `main`.
+- **LocalAI-ready:** Exposes `llama-server`, compatible with LocalAI's backend interface.
 
-## How to Use
+## Image
 
-### 1. Deployment via Docker
-Pull the image from GHCR (replace `USER` and `REPO` with your details):
-```bash
-docker pull ghcr.io/USER/REPO:main
+```
+ghcr.io/secondof9/llama-cpp-openvino-backend:main
 ```
 
-Run the container with Intel GPU passthrough:
+Tags: `main`, `sha-<commit>`.
+
+---
+
+## Option 1: Use as a LocalAI backend gallery (recommended)
+
+LocalAI can pull custom backends from a **backend gallery** — a simple YAML file hosted over HTTP/HTTPS.
+
+### 1. Point LocalAI at this repo's gallery YAML
+
+```bash
+export LOCALAI_BACKEND_GALLERIES='[{"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}']'
+```
+
+The YAML file (`backends/llama-cpp-openvino.yaml`) defines:
+
+```yaml
+- name: "llama-cpp-openvino"
+  description: "llama.cpp backend with Intel OpenVINO acceleration"
+  uri: "ghcr.io/secondof9/llama-cpp-openvino-backend:main"
+  alias: "llama-cpp"
+  tags:
+    - "llm"
+    - "text-generation"
+    - "openvino"
+    - "intel"
+```
+
+### 2. Make the image accessible
+
+The image is currently **private** (requires authentication). Either:
+
+- **Make it public:** Go to the package page → **Settings** → **Change package visibility** → **Public**, **or**
+- **Keep it private:** provide credentials (see below).
+
+### 3. Keep it private — add credentials
+
+If you keep the image private, create a `credentials.yaml`:
+
+```yaml
+- match: ghcr.io/secondof9
+  username: secondof9
+  password: <your GitHub PAT or GHCR token>
+```
+
+Then run LocalAI with:
+
+```bash
+local-ai run --credentials-file credentials.yaml
+```
+
+Gallery files never contain secrets — credentials are kept separate.
+
+---
+
+## Option 2: Run the image directly
+
+Pull the image:
+
+```bash
+docker pull ghcr.io/secondof9/llama-cpp-openvino-backend:main
+```
+
+Run it with Intel GPU passthrough:
+
 ```bash
 docker run -d \
   --name localai-openvino \
   --device /dev/dri:/dev/dri \
   -p 8080:8080 \
-  ghcr.io/USER/REPO:main \
+  ghcr.io/secondof9/llama-cpp-openvino-backend:main \
   --model /path/to/your/model.gguf
-```
-
-### 2. Integration with LocalAI
-To use this as a custom backend in LocalAI, add the image to your `docker-compose.yml` as a service and configure your model YAML to point to the `openvino-llama` alias.
+```n
