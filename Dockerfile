@@ -7,14 +7,19 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
-    git \n    curl \
-    wget \n    ca-certificates \n    && rm -rf /var/lib/apt/lists/*
+    git \
+    curl \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Intel OpenVINO Toolkit
 # This uses the official Intel repository setup
 RUN wget https://apt.repos.intel.com/intel-setup.deb && \
     dpkg -i intel-setup.deb && \
-    apt-get update && \n    apt-get install -y intel-openvino-runtime libopenvino-dev && \n    rm intel-setup.deb
+    apt-get update && \
+    apt-get install -y intel-openvino-runtime libopenvino-dev && \
+    rm intel-setup.deb
 
 # Set working directory
 WORKDIR /app
