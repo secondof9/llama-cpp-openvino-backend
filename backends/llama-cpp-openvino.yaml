@@ -1,0 +1,18 @@
+# LocalAI Backend Gallery entry
+# Copy this file (or the URL below) into your LocalAI installation to add
+# the OpenVINO-accelerated llama.cpp backend.
+#
+# Usage:
+#   export LOCALAI_BACKEND_GALLERIES='[{"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}']
+#
+# The image is ghcr.io/secondof9/llama-cpp-openvino-backend:main
+# If the image is private, also provide credentials (see README.md).
+- name: "llama-cpp-openvino"
+  description: "llama.cpp backend with Intel OpenVINO acceleration (CPU/iGPU/dGPU/NPU)"
+  uri: "ghcr.io/secondof9/llama-cpp-openvino-backend:main"
+  alias: "llama-cpp"
+  tags:
+    - "llm"
+    - "text-generation"
+    - "openvino"
+    - "intel"
