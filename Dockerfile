@@ -102,9 +102,9 @@ WORKDIR /LocalAI/backend/cpp/llama-cpp
 # Note: setupvars.sh references unbound variables ($python_version), so source it before enabling `set -u`.
 RUN bash -c "source ${OpenVINO_DIR}/setupvars.sh && \
     set -euxo pipefail && \
-    export EXTRA_CMAKE_ARGS='-DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_OPENVINO=ON' && \
+    export CMAKE_ARGS='-DGGML_OPENVINO=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache' && \
     make llama-cpp-cpu-all && \
-    CMAKE_ARGS='-DGGML_OPENVINO=ON' make llama-cpp-grpc && \
+    make llama-cpp-grpc && \
     make llama-cpp-rpc-server"
 
 # Run LocalAI's standard packaging script (copies run.sh, binaries, lib/ld.so, system libs, and ggml-shared-libs)
