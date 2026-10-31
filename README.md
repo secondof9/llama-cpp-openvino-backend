@@ -1,63 +1,79 @@
 # LocalAI OpenVINO Llama.cpp Backend
 
-This repository builds a custom Docker image of `llama.cpp` compiled with **Intel OpenVINO** support and pushes it to GitHub Container Registry (GHCR). It is designed to be used as a custom backend for [LocalAI](https://localai.io/).
+This repository builds a LocalAI-compatible `llama-cpp` gRPC backend OCI artifact image compiled with **Intel OpenVINO** (`-DGGML_OPENVINO=ON`) and pushes it to GitHub Container Registry (GHCR).
+
+Unlike a standalone `llama-server` container, LocalAI backend images are `FROM scratch` filesystem bundles containing `/run.sh`, LocalAI's compiled `grpc-server` binaries (`llama-cpp-cpu-all`, `llama-cpp-grpc`, `llama-cpp-rpc-server`), and self-contained `/lib` shared libraries (OpenVINO Runtime + plugins, `libggml-openvino.so`, OpenCL ICD, and Intel GPU/NPU Level Zero drivers).
 
 ## Features
-- **OpenVINO Acceleration:** Optimized for Intel CPUs, iGPUs, dGPUs, and NPUs.
+- **OpenVINO Acceleration:** Optimized for Intel CPUs, iGPUs, dGPUs, and NPUs (`GGML_OPENVINO_DEVICE=CPU|GPU|NPU`).
+- **Self-Contained LocalAI Backend Package:** Includes `run.sh`, `grpc-server` binaries, OpenVINO runtime plugins (`plugins.xml`), and Intel GPU/NPU drivers under `/lib`.
 - **Automated CI/CD:** Builds and pushes to GHCR on every push to `main`.
-- **LocalAI-ready:** Exposes `llama-server`, compatible with LocalAI's backend interface.
 
 ## Image
 
-```
+```text
 ghcr.io/secondof9/llama-cpp-openvino-backend:main
 ```
 
-Tags: `main`, `sha-<commit>`.
+Tags: `main`, `latest`, `sha-<commit>`.
 
 ---
 
-## Option 1: Use as a LocalAI backend gallery (recommended)
+## Option 1: Install Directly in LocalAI (Simplest)
 
-LocalAI can pull custom backends from a **backend gallery** — a simple YAML file hosted over HTTP/HTTPS.
+You can install this backend directly from the OCI image without configuring a gallery:
 
-### 1. Point LocalAI at this repo's gallery YAML
-
+### Via REST API
 ```bash
-export LOCALAI_BACKEND_GALLERIES='[{"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}]'
+curl -X POST http://localhost:8080/api/backends/install-external \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "ghcr.io/secondof9/llama-cpp-openvino-backend:main",
+    "name": "llama-cpp-openvino",
+    "alias": "llama-cpp"
+  }'
 ```
 
-The YAML file (`backends/llama-cpp-openvino.yaml`) defines:
-
-```yaml
-- name: "llama-cpp-openvino"
-  description: "llama.cpp backend with Intel OpenVINO acceleration"
-  uri: "ghcr.io/secondof9/llama-cpp-openvino-backend:main"
-  alias: "llama-cpp"
-  tags:
-    - "llm"
-    - "text-generation"
-    - "openvino"
-    - "intel"
+### Via CLI
+```bash
+local-ai backends install "ghcr.io/secondof9/llama-cpp-openvino-backend:main"
 ```
 
 ---
 
-## Option 2: Run the image directly
+## Option 2: Use as a LocalAI Backend Gallery
 
-Pull the image:
+LocalAI can pull custom backends from a **backend gallery** YAML file hosted over HTTP/HTTPS.
+
+> [!IMPORTANT]
+> Setting `LOCALAI_BACKEND_GALLERIES` replaces LocalAI's default gallery list unless you include the default `localai` gallery entry alongside your custom one.
 
 ```bash
-docker pull ghcr.io/secondof9/llama-cpp-openvino-backend:main
+export LOCALAI_BACKEND_GALLERIES='[
+  {"name":"localai","url":"github:mudler/LocalAI/backend/index.yaml@master"},
+  {"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}
+]'
 ```
 
-Run it with Intel GPU passthrough:
+Then install via the Web UI (**Backends** -> search `llama-cpp-openvino`) or via API:
+
+```bash
+curl -X POST http://localhost:8080/api/backends/install/llama-cpp-openvino
+```
+
+---
+
+## Selecting the OpenVINO Device (CPU / GPU / NPU)
+
+Pass the OpenVINO device environment variables to your LocalAI container (and pass through `/dev/dri` for Intel iGPU/dGPU or `/dev/accel` for Intel NPU):
 
 ```bash
 docker run -d \
-  --name localai-openvino \
-  --device /dev/dri:/dev/dri \
+  --name localai \
+  --device /dev/dri \
+  -e GGML_OPENVINO_DEVICE=GPU \
+  -e GGML_OPENVINO_STATEFUL_EXECUTION=1 \
+  -e LOCALAI_BACKEND_GALLERIES='[{"name":"localai","url":"github:mudler/LocalAI/backend/index.yaml@master"},{"name":"secondof9","url":"https://raw.githubusercontent.com/secondof9/llama-cpp-openvino-backend/main/backends/llama-cpp-openvino.yaml"}]' \
   -p 8080:8080 \
-  ghcr.io/secondof9/llama-cpp-openvino-backend:main \
-  --model /path/to/your/model.gguf
+  localai/localai:latest
 ```
