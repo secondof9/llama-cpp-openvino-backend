@@ -53,12 +53,15 @@ RUN apt-get update && \
         intel-opencl-icd && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Intel OpenVINO Runtime & Dev Toolkit for Ubuntu 24.04
-RUN mkdir -p /opt/intel && \
-    wget -q -O /tmp/openvino.tgz \
-        "https://storage.openvinotoolkit.org/repositories/openvino/packages/${OPENVINO_VERSION_MAJOR}/linux/openvino_toolkit_ubuntu24_${OPENVINO_VERSION_FULL}_x86_64.tgz" && \
-    tar -xf /tmp/openvino.tgz -C /opt/intel/ && \
-    rm -f /tmp/openvino.tgz && \
+# Install Intel OpenVINO Runtime & Dev Toolkit for Ubuntu 24.04 (cached download)
+RUN --mount=type=cache,target=/var/cache/openvino,sharing=locked \
+    mkdir -p /opt/intel && \
+    TGZ=/var/cache/openvino/openvino_toolkit_ubuntu24_${OPENVINO_VERSION_FULL}_x86_64.tgz && \
+    if [ ! -f "$TGZ" ]; then \
+        wget -q -O "$TGZ" \
+            "https://storage.openvinotoolkit.org/repositories/openvino/packages/${OPENVINO_VERSION_MAJOR}/linux/openvino_toolkit_ubuntu24_${OPENVINO_VERSION_FULL}_x86_64.tgz"; \
+    fi && \
+    tar -xf "$TGZ" -C /opt/intel/ && \
     mv "/opt/intel/openvino_toolkit_ubuntu24_${OPENVINO_VERSION_FULL}_x86_64" "/opt/intel/openvino_${OPENVINO_VERSION_MAJOR}" && \
     ln -sfn "/opt/intel/openvino_${OPENVINO_VERSION_MAJOR}" /opt/intel/openvino && \
     if [ -x /opt/intel/openvino/install_dependencies/install_openvino_dependencies.sh ]; then \
@@ -67,9 +70,10 @@ RUN mkdir -p /opt/intel && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Intel GPU (Compute Runtime + IGC) and NPU Level Zero drivers so they can
-# be packaged into /lib for self-contained execution inside LocalAI
-RUN set -eux; \
-    mkdir -p /tmp/intel-drivers && cd /tmp/intel-drivers; \
+# be packaged into /lib for self-contained execution inside LocalAI (cached downloads)
+RUN --mount=type=cache,target=/var/cache/intel-drivers,sharing=locked \
+    set -eux; \
+    cd /var/cache/intel-drivers; \
     for url in \
         "https://github.com/intel/intel-graphics-compiler/releases/download/${IGC_VERSION}/intel-igc-core-${IGC_VERSION_FULL}_amd64.deb" \
         "https://github.com/intel/intel-graphics-compiler/releases/download/${IGC_VERSION}/intel-igc-opencl-${IGC_VERSION_FULL}_amd64.deb" \
@@ -78,10 +82,14 @@ RUN set -eux; \
         "https://github.com/intel/compute-runtime/releases/download/${COMPUTE_RUNTIME_VERSION}/libigdgmm12_${IGDGMM_VERSION}_amd64.deb" \
         "https://github.com/intel/compute-runtime/releases/download/${COMPUTE_RUNTIME_VERSION}/libze-intel-gpu1_${COMPUTE_RUNTIME_VERSION_FULL}_amd64.deb" \
         "https://snapshot.ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu/20260830T100000Z/pool/main/l/level-zero-loader/libze1_${LIBZE1_VERSION}_amd64.deb"; do \
-        wget -q "$url"; \
+        deb_file=$(basename "$url"); \
+        [ -f "$deb_file" ] || wget -q -O "$deb_file" "$url"; \
     done; \
-    wget -q -O npu.tar.gz "https://github.com/intel/linux-npu-driver/releases/download/${NPU_DRIVER_VERSION}/linux-npu-driver-${NPU_DRIVER_FULL}-ubuntu2404.tar.gz" && \
-    tar -xf npu.tar.gz && rm -f npu.tar.gz; \
+    npu_tgz="linux-npu-driver-${NPU_DRIVER_FULL}-ubuntu2404.tar.gz"; \
+    [ -f "$npu_tgz" ] || wget -q -O "$npu_tgz" "https://github.com/intel/linux-npu-driver/releases/download/${NPU_DRIVER_VERSION}/linux-npu-driver-${NPU_DRIVER_FULL}-ubuntu2404.tar.gz"; \
+    mkdir -p /tmp/intel-drivers && cd /tmp/intel-drivers; \
+    cp /var/cache/intel-drivers/*.deb .; \
+    tar -xf "/var/cache/intel-drivers/${npu_tgz}"; \
     apt-get update && apt-get install -y --no-install-recommends ./*.deb && \
     cd / && rm -rf /tmp/intel-drivers /var/lib/apt/lists/*
 
@@ -99,13 +107,18 @@ WORKDIR /LocalAI/backend/cpp/llama-cpp
 # - llama-cpp-cpu-all (dynamic ggml backends including libggml-openvino.so + CPU variants)
 # - llama-cpp-grpc (distributed RPC support)
 # - llama-cpp-rpc-server
+# Uses BuildKit ccache mount to persist compiled objects across builds.
 # Note: setupvars.sh references unbound variables ($python_version), so source it before enabling `set -u`.
-RUN bash -c "source ${OpenVINO_DIR}/setupvars.sh && \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+    bash -c "source ${OpenVINO_DIR}/setupvars.sh && \
     set -euxo pipefail && \
+    export CCACHE_DIR=/root/.ccache && \
+    ccache --max-size=5G || true && \
     export CMAKE_ARGS='-DGGML_OPENVINO=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache' && \
     make llama-cpp-cpu-all && \
     make llama-cpp-grpc && \
-    make llama-cpp-rpc-server"
+    make llama-cpp-rpc-server && \
+    ccache -s || true"
 
 # Run LocalAI's standard packaging script (copies run.sh, binaries, lib/ld.so, system libs, and ggml-shared-libs)
 RUN bash -c "source ${OpenVINO_DIR}/setupvars.sh && make -BC /LocalAI/backend/cpp/llama-cpp package"
