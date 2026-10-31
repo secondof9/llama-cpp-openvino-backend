@@ -99,8 +99,9 @@ WORKDIR /LocalAI/backend/cpp/llama-cpp
 # - llama-cpp-cpu-all (dynamic ggml backends including libggml-openvino.so + CPU variants)
 # - llama-cpp-grpc (distributed RPC support)
 # - llama-cpp-rpc-server
-RUN bash -c "set -euxo pipefail && \
-    source ${OpenVINO_DIR}/setupvars.sh && \
+# Note: setupvars.sh references unbound variables ($python_version), so source it before enabling `set -u`.
+RUN bash -c "source ${OpenVINO_DIR}/setupvars.sh && \
+    set -euxo pipefail && \
     export EXTRA_CMAKE_ARGS='-DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_OPENVINO=ON' && \
     make llama-cpp-cpu-all && \
     CMAKE_ARGS='-DGGML_OPENVINO=ON' make llama-cpp-grpc && \
@@ -110,7 +111,7 @@ RUN bash -c "set -euxo pipefail && \
 RUN bash -c "source ${OpenVINO_DIR}/setupvars.sh && make -BC /LocalAI/backend/cpp/llama-cpp package"
 
 # Bundle OpenVINO runtime libraries, plugins.xml, OpenCL ICD, and Intel GPU/NPU Level Zero drivers into package/lib
-RUN bash -c 'set -euxo pipefail; \
+RUN bash -c 'set -exo pipefail; \
     source /LocalAI/scripts/build/package-gpu-libs.sh /LocalAI/backend/cpp/llama-cpp/package/lib; \
     # 1. Copy OpenVINO runtime libraries and plugins.xml (required for dynamic plugin discovery) \
     cp -avf ${OpenVINO_DIR}/runtime/lib/intel64/*.so* /LocalAI/backend/cpp/llama-cpp/package/lib/; \
